@@ -1,0 +1,388 @@
+---
+title: "Groove with Data: Exploring Spotify's Musical Canvas"
+subtitle: "Sta 344/644 - Final Project"
+format: 
+  html:
+    self-contained: true
+author:
+- Sayali Pingle
+---
+
+## Introduction
+Get ready to dive into the beats, visualize the trends, and discover the stories that data tells about your musical favorites.
+The primary goal of this project is to develop an interactive and visually appealing Shiny web application that enables users to explore and analyze the audio features of their favorite music artists on Spotify. The implementation is designed to be open-ended, providing flexibility for users to analyze and showcase their chosen artist's discography. This project not only serves as a valuable exploration of data analysis but also offers a practical application of the Spotify API and Shiny for creating an engaging user interface.
+
+```R
+# Load required libraries
+library(shiny)
+library(spotifyr)
+library(tidyverse)
+
+# Function to retrieve and analyze Spotify data for a given artist
+artist_details <- function(artist_name, client_id, secret_id) {
+  # Set Spotify API credentials
+  Sys.setenv(SPOTIFY_CLIENT_ID = client_id)
+  Sys.setenv(SPOTIFY_CLIENT_SECRET = secret_id)
+  
+  # Get Spotify access token
+  access_token <- get_spotify_access_token()
+  
+  # Try to retrieve artist details and handle errors
+  result <- tryCatch({
+    # Get artist audio features
+    artist_det <- get_artist_audio_features(artist_name)
+    
+    # Get top tracks for the artist
+    top_tracks <- get_artist_top_tracks(id = artist_det$artist_id[1])
+    
+    # Check if artist details are available
+    if (length(artist_det$artist_id) == 0 || nrow(artist_det) == 0) {
+      return(NULL)
+    } else {
+      # Summarize audio features by album
+      result <- artist_det %>%
+        group_by(album_name) %>%
+        summarize(
+          mean_energy = mean(energy),
+          mean_danceability = mean(danceability),
+          mean_liveness = mean(liveness)
+        )
+      
+      # Create a plot of the top 5 tracks by popularity
+      popularity_plot <- top_tracks %>%
+        select(name, popularity) %>%
+        arrange(desc(popularity)) %>%
+        slice_head(n = 5) %>%
+        ggplot(aes(x = reorder(factor(name), popularity), y = popularity)) +
+        geom_bar(stat = "identity", fill = "#69b3a2", color = "#69b3a2", alpha = 0.8) +
+        labs(
+          title = "5 most popular tracks with popularity scores",
+          x = "Track",
+          y = "Popularity score"
+        ) +
+        # Additional theming for the popularity plot
+        theme(
+          plot.background = element_rect(fill = "black"),
+          panel.background = element_rect(fill = "black"),
+          panel.grid.major = element_line(color = "grey50"),
+          axis.text = element_text(color = "white", face = "bold", size = 14),
+          axis.title = element_text(color = "white", face = "bold", size = 12),
+          plot.title = element_text(color = "white", face = "bold", size = 12)
+        ) +
+        coord_flip()
+      
+      # Create a plot of the distribution of key modes
+      key_plot <- artist_det %>%
+        group_by(key_mode) %>%
+        summarise(count = n()) %>%
+        filter(count > 5) %>%
+        arrange(desc(count)) %>%
+        ggplot(aes(x = reorder(factor(key_mode), count), y = count)) +
+        geom_segment(
+          aes(xend = reorder(factor(key_mode), count), yend = 0),
+          color = "#69b3a2",
+          size = 3
+        ) +
+        geom_point(
+          aes(x = reorder(factor(key_mode), count), y = count),
+          color = "red",
+          size = 5
+        ) +
+        labs(
+          title = "Distribution of Key Modes",
+          x = "Key Mode",
+          y = "Count"
+        ) +
+        # Additional theming for the distribution of key modes plot
+        theme(
+          plot.background = element_rect(fill = "black"),
+          panel.background = element_rect(fill = "black"),
+          panel.grid.major = element_line(color = "grey50"),
+          axis.text = element_text(color = "white", face = "bold", size = 14),
+          axis.title = element_text(color = "white", face = "bold", size = 12),
+          plot.title = element_text(color = "white", face = "bold", size = 12)
+        ) +
+        coord_flip()
+      
+      # Create a heatmap of mean valence per album
+      heatmap_plot <- ggplot(
+        artist_det %>%
+          group_by(album_name) %>%
+          summarize(mean_valence = mean(valence)) %>%
+          arrange(desc(mean_valence)) %>%
+          slice_head(n = 15),
+        aes(x = reorder(album_name, mean_valence), y = factor(1))
+      ) +
+        geom_tile(aes(fill = mean_valence), color = "white") +
+        scale_fill_gradient(low = "red", high = "green", limits = c(-0.1, 1)) +
+        theme_minimal() +
+        # Additional theming for the heatmap plot
+        theme(
+          plot.background = element_rect(fill = "black"),
+          panel.background = element_rect(fill = "black"),
+          panel.grid.major = element_line(color = "grey50"),
+          axis.text.y = element_text(color = "white", face = "bold", size = 12),
+          axis.text.x = element_blank(),
+          axis.title = element_blank(),
+          plot.title = element_text(color = "white", face = "bold", size = 12)
+        ) +
+        labs(
+          title = "Heatmap of Mean Valence per Album",
+          x = "",
+          y = ""
+        ) +
+        coord_flip()
+      
+      # Calculate average song duration
+      song_dur <- round((artist_det %>%
+                           summarise(mean(duration_ms)) / 60000), 2)
+      
+      # Calculate max energy and associated album
+      max_energy <- round(max(result$mean_energy, na.rm = TRUE), 2)
+      max_energy_album <- result$album_name[which.max(result$mean_energy)]
+      
+      # Calculate max danceability and associated album
+      max_danceability <- round(max(result$mean_danceability, na.rm = TRUE), 2)
+      max_danceability_album <- result$album_name[which.max(result$mean_danceability)]
+      
+      # Calculate max liveness and associated album
+      max_liveness <- round(max(result$mean_liveness, na.rm = TRUE), 2)
+      max_liveness_album <- result$album_name[which.max(result$mean_liveness)]
+      
+      # Return a list of results
+      return(list(
+        artist_id = artist_det$artist_id[1],
+        max_energy_album = max_energy_album,
+        max_danceability_album = max_danceability_album,
+        max_energy = max_energy,
+        max_danceability = max_danceability,
+        max_liveness = max_liveness,
+        max_liveness_album = max_liveness_album,
+        key_plot = key_plot,
+        popularity_plot = popularity_plot,
+        heatmap_plot = heatmap_plot,
+        song_dur = song_dur
+      ))
+    }
+  }, error = function(e) {
+    # Handle errors and return default values
+    return(list(
+      artist_id = NULL,
+      max_energy_album = "",
+      max_danceability_album = "",
+      max_energy = NA,
+      max_danceability = NA,
+      key_plot = NA,
+      song_dur = ""
+    ))
+  })
+  
+  return(result)
+}
+
+# Shiny UI
+ui <- fluidPage(
+  shinyjs::useShinyjs(),
+  titlePanel(
+    div(
+      style = "font-weight: bold; font-family: 'Arial', sans-serif; font-size: 42px;",
+      "KNOW YOUR FAVOURITE SINGERS!!"
+    )
+  ),
+  tags$style(HTML("
+    body {
+      background: linear-gradient(to right, #50C878, #000000);
+    }
+    .my-well-panel {
+      background-color: #013220;
+      border: 1px solid #000000;
+      border-radius: 3px;
+      padding: 10px;
+      margin: 10px 0;
+    }
+    .my-well-panel-text {
+      color: #FFFFFF;
+      font-size: 14px;
+      font-family: 'Arial', sans-serif;
+    }
+  ")),
+  sidebarLayout(
+    sidebarPanel(
+      width = 3,
+      textInput("artist_name", "Enter Artist Name", ""),
+      textInput("client_id", "Enter API Client ID", value = "4a8518820eed448b8fe7057732e01a56"),
+      textInput("secret_id", "Enter API Secret ID", value = "e0ca0b77788c4405b7f307beb584bc52"),
+      actionButton("analyze_button", "Analyze"),
+      htmlOutput("frame"),
+      conditionalPanel(
+        condition = "input.analyze_button > 0 && !output.frame",
+        tags$div(
+          class = "loading-message",
+          style = "color: #000000; font-size: 14px; font-family: 'Arial', sans-serif;",
+          "Loading results. Please wait..."
+        )
+      )
+    ),
+    mainPanel(
+      fluidRow(
+        column(8, plotOutput("countPlot")),
+        column(4, wellPanel(
+          textOutput("max_energy_album_output"),
+          style = "background-color: #013220; border: 1px solid #000000; border-radius: 3px; padding: 10px; margin: 10px 0; color: white; font-size: 15px;"
+        ), wellPanel(
+          textOutput("max_danceability_album_output"),
+          style = "background-color: #013220; border: 1px solid #000000; border-radius: 3px; padding: 10px; margin: 10px 0; color: white; font-size: 15px;"
+        ), wellPanel(
+          textOutput("max_liveness_album_output"),
+          style = "background-color: #013220; border: 1px solid #000000; border-radius: 3px; padding: 10px; margin: 10px 0; color: white; font-size: 15px;"
+        ), wellPanel(
+          textOutput("avg_song_duration"),
+          style = "background-color: #013220; border: 1px solid #000000; border-radius: 3px; padding: 10px; margin: 10px 0; color: white; font-size: 15px;"
+        ))
+      ),
+      fluidRow(
+        style = "margin-top: 5px;",
+        column(7, plotOutput("popPlot")),
+        column(5, plotOutput("valence_plot"))
+      )
+    )
+  )
+)
+
+# Shiny Server
+server <- function(input, output) {
+  observeEvent(input$analyze_button, {
+    # Reset the frame and loading message when the artist name changes
+    output$frame <- renderUI(NULL)
+    # Enable loading message
+    shinyjs::enable("loading-message")
+    
+    # Retrieve and analyze artist details
+    result <- artist_details(input$artist_name, input$client_id, input$secret_id)
+    
+    # Check if artist details are available
+    if (!is.null(result$artist_id)) {
+      # Render Spotify artist iframe
+      output$frame <- renderUI({
+        shinyjs::disable("loading-message")
+        tags$iframe(
+          src = paste0(
+            "https://open.spotify.com/embed/artist/",
+            result$artist_id,
+            "?utm_source=generator"
+          ),
+          seamless = "seamless",
+          width = "100%",
+          height = "352px",
+          frameBorder = "0"
+        )
+      })
+      
+      # Render text outputs
+      output$max_energy_album_output <- renderText({
+        paste("Max ENERGY Album: ", result$max_energy_album, "SCORE:", result$max_energy)
+      })
+      output$max_danceability_album_output <- renderText({
+        paste("Max DANCEABILITY Album: ", result$max_danceability_album, "SCORE:", result$max_danceability)
+      })
+      output$max_liveness_album_output <- renderText({
+        paste("Most LIVELY Album: ", result$max_liveness_album, "SCORE:", result$max_liveness)
+      })
+      output$avg_song_duration <- renderText({
+        paste("Average Song Duration: ", result$song_dur, "minutes")
+      })
+      
+      # Render plots
+      output$countPlot <- renderPlot({
+        if (!is.null(result$key_plot)) {
+          print(result$key_plot)
+        } else {
+          plot(NULL, type = "n", xlab = "", ylab = "")
+        }
+      })
+      output$popPlot <- renderPlot({
+        if (!is.null(result$popularity_plot)) {
+          print(result$popularity_plot)
+        } else {
+          plot(NULL, type = "n", xlab = "", ylab = "")
+        }
+      })
+      output$valence_plot <- renderPlot({
+        if (!is.null(result$heatmap_plot)) {
+          print(result$heatmap_plot)
+        } else {
+          plot(NULL, type = "n", xlab = "", ylab = "")
+        }
+      })
+    } else {
+      # Handle case where no albums are found for the artist
+      output$frame <- renderUI({
+        shinyjs::disable("loading-message")
+        tags$div("Oops! No Albums found for this Artist 🥺")
+      })
+    }
+  })
+}
+
+# Run the Shiny App
+shinyApp(ui, server)
+
+
+```
+
+## Methods / Implementation
+
+## Shiny App Structure
+The project is implemented as a Shiny web application, utilizing the shiny library. The Shiny app is structured with a well-designed User Interface (UI) and a server logic component. The UI includes text inputs for the artist's name and Spotify API credentials, an "Analyze" button to trigger the analysis, and various output components for visualizations and summary statistics. The server logic handles the interactions between the UI and the backend computations, making use of the spotifyr package to retrieve and analyze data from the Spotify API.
+
+## Data Retrieval with spotifyr
+The core functionality is encapsulated in the artist_details function, which takes the artist's name, client ID, and secret ID as input parameters. This function establishes the Spotify API credentials, obtains the access token, and retrieves relevant data about the artist using the spotifyr package. The get_artist_audio_features function includes information regarding the artist's albums and tracks, documenting musical parameters such as liveliness, valence, and energy for each track on a scale from 0 to 1.
+
+Additionally, the get_artist_top_tracks function plays a crucial role in enhancing the comprehensiveness of the artist's profile. This function retrieves the top tracks of the artist, providing valuable insights into their most popular and widely acclaimed musical creations. These top tracks, accompanied by their popularity scores, contribute to a more holistic understanding of the artist's impact and resonance within the Spotify platform.
+
+## Visualization Design using ggplot2
+The visualizations in the project are carefully crafted using the ggplot2 package, known for its flexibility and aesthetics. The design principles focus on creating visually appealing and informative plots that seamlessly integrate into the overall Shiny app theme.
+
+### 1. Popularity Plot
+The popularity plot showcases the top 5 tracks of the artist along with their popularity scores. The plot uses a dark background theme, with bars filled in a green color to represent popularity scores. The overall visual style is cohesive with the Shiny app, providing a comprehensive and attractive representation of the artist's most popular tracks.
+
+### 2. Distribution of Key Modes
+The segmented bar chart showcasing the distribution of key modes adheres to a coherent design aesthetic. Employing a dark background, punctuated by vivid red points and a harmonious color palette, ensures a visually consistent and appealing experience across all visualizations within the Shiny app. This chart elucidates the artist's most frequently utilized key modes. Given the substantial number of key modes, the choice of a segmented bar chart over a traditional bar chart enhances the visual appeal, minimizing clutter and elevating the overall aesthetic quality of the representation.
+
+### 3. Heatmap of Mean Valence per Album
+The heatmap is constructed based on the mean valence scores of the artist's albums, providing a nuanced understanding of the emotional tones embedded in each album's musical composition. Mean valence, a musical parameter ranging from 0 to 1, gauges the positivity or negativity of the tracks. The higher the valence, the more positive and cheerful the music is perceived.
+
+#### Design and Composition:
+Data Arrangement: Albums are arranged in descending order based on their mean valence scores, facilitating a quick grasp of the emotional trajectory across the artist's discography.
+#### Color Gradients: 
+The use of a red-to-green color gradient effectively communicates the spectrum of emotional tones. Red signifies lower valence (darker, less positive), while green indicates higher valence (lighter, more positive). The transition between these colors provides a visually intuitive representation.
+
+## Displaying Results in the Shiny App
+The Shiny app presents a cohesive display of visualizations and pertinent summary statistics, fostering an intuitive and engaging user experience.
+
+### Embeded Spotify artist's song tracks:
+This feature seamlessly integrates the artist's top tracks, providing users with a technical and interactive auditory experience. Users can dynamically engage with the data analytics while simultaneously enjoying a real-time demonstration of the artist's musical style. The embedded playlist enhances the overall user interaction and adds a layer of technical depth to the Shiny app.
+
+### Importance of Summary Statistics:
+The inclusion of summary statistics is pivotal for users seeking a comprehensive understanding of the artist's musical preferences. These statistics distill complex musical parameters into digestible insights, providing a quick overview of the artist's distinctive style. Key metrics, such as mean energy, mean danceability, and mean liveness, offer quantitative measures of the artist's sonic profile.
+
+### Comparative Analysis of Artist Tastes:
+Users can leverage these summary statistics for comparative analysis, gaining valuable insights into how the artist's musical attributes evolve across albums and tracks. For instance, mean energy provides a measure of the overall intensity and vigor of the music, while mean danceability sheds light on its rhythmic and dance-worthy qualities. These metrics empower users to discern patterns and preferences.
+
+By juxtaposing summary statistics with the immersive visualizations, users can uncover nuanced connections between the artist's overarching musical themes and the specific characteristics of individual tracks and albums. This dual approach ensures that both data-driven enthusiasts and those with a more intuitive appreciation for music can derive meaningful insights from the Shiny app, creating a well-rounded and satisfying exploration of the artist's musical journey.
+
+## Shiny App Themes
+To further enhance the overall aesthetic of the Shiny app, custom styles are applied to the UI components. The background is set to a gradient that complements the dark theme of the visualizations and matches the Spotify app theme style. Well panels are styled with background colors, borders, and text attributes, ensuring a polished and cohesive look.
+
+## Handling Errors
+The implementation incorporates robust error handling using the tryCatch block in the artist_details function. In case of errors during API calls or data processing, the Shiny app gracefully handles the situation, providing appropriate messages to the user.
+Discussion & Conclusion
+The project successfully achieves its primary goal of creating an interactive and visually appealing Shiny web application for exploring and analyzing an artist's music on Spotify. The visualizations, designed using ggplot2, contribute to a comprehensive and aesthetically pleasing user experience. The dark theme and consistent color palette across visualizations and the Shiny app's UI components create a sense of unity and professionalism.
+
+## Challenges and Limitations
+While the project demonstrates success in achieving its objectives, challenges may arise from potential issues with the Spotify API, such as rate limiting or variations in data availability. Additionally, the project's limitations include dependency on the accuracy of Spotify data and potential biases in popularity scores.
+
+## Future Enhancements
+To further improve the project, future developments could include refining visualizations, incorporating additional audio features, and exploring machine learning techniques for personalized analyses. User feedback and iterative development could contribute to an even more robust and user-friendly application.
+
+In conclusion, this project showcases the effective integration of Shiny, ggplot2 and the Spotify API, providing users with an engaging platform to explore and analyze their favorite artists' music. The open-ended nature of the project encourages creativity and adaptability, making it a valuable addition to a graduation portfolio or a showcase for prospective employers. The careful consideration of design principles ensures not only functionality but also an aesthetically pleasing and user-friendly experience.
