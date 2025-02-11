@@ -274,108 +274,41 @@ server <- function(input, output) {
   )
   
   observeEvent(input$analyze_button, {
-    w$show()  # Show loading screen
+    req(input$artist_name)  # Ensure artist name is provided
     
     tryCatch({
-      # Use environment variables instead of input values
-      Sys.setenv(SPOTIFY_CLIENT_ID = Sys.getenv("SPOTIFY_CLIENT_ID"))
-      Sys.setenv(SPOTIFY_CLIENT_SECRET = Sys.getenv("SPOTIFY_CLIENT_SECRET"))
+      # Get artist ID
+      artist_info <- search_spotify(input$artist_name, type = "artist")
       
-      access_token <- get_spotify_access_token(
-        client_id = Sys.getenv("SPOTIFY_CLIENT_ID"),
-        client_secret = Sys.getenv("SPOTIFY_CLIENT_SECRET")
+      if (nrow(artist_info) == 0) {
+        showNotification("Artist not found", type = "error")
+        return()
+      }
+      
+      artist_id <- artist_info$id[1]
+      
+      # Get albums
+      albums <- get_artist_albums(
+        artist_id,
+        include_groups = c("album", "single"),
+        limit = 50
       )
       
-      # Retrieve and analyze artist details
-      result <- artist_details(input$artist_name, Sys.getenv("SPOTIFY_CLIENT_ID"), Sys.getenv("SPOTIFY_CLIENT_SECRET"))
-      
-      # Check if artist details are available
-      if (!is.null(result$artist_id)) {
-        # Render Spotify artist iframe
-        output$frame <- renderUI({
-          tags$iframe(
-            src = paste0(
-              "https://open.spotify.com/embed/artist/",
-              result$artist_id,
-              "?utm_source=generator"
-            ),
-            seamless = "seamless",
-            width = "100%",
-            height = "352px",
-            frameBorder = "0"
-          )
-        })
-        
-        # Render text outputs
-        output$max_energy_album_output <- renderText({
-          paste("Max ENERGY Album: ", result$max_energy_album, "SCORE:", result$max_energy)
-        })
-        output$max_danceability_album_output <- renderText({
-          paste("Max DANCEABILITY Album: ", result$max_danceability_album, "SCORE:", result$max_danceability)
-        })
-        output$max_liveness_album_output <- renderText({
-          paste("Most LIVELY Album: ", result$max_liveness_album, "SCORE:", result$max_liveness)
-        })
-        output$avg_song_duration <- renderText({
-          paste("Average Song Duration: ", result$song_dur, "minutes")
-        })
-        
-        # Render plots
-        output$countPlot <- renderPlotly({
-          if (!is.null(result$key_plot)) {
-            ggplotly(result$key_plot)
-          }
-        })
-        output$popPlot <- renderPlotly({
-          if (!is.null(result$popularity_plot)) {
-            ggplotly(result$popularity_plot)
-          }
-        })
-        output$valence_plot <- renderPlotly({
-          if (!is.null(result$heatmap_plot)) {
-            ggplotly(result$heatmap_plot)
-          }
-        })
-        
-        # Add value boxes
-        output$energy_box <- renderValueBox({
-          valueBox(
-            paste0(result$max_energy * 100, "%"),
-            "Max Energy",
-            icon = icon("bolt"),
-            color = "green"
-          )
-        })
-        
-        # Add similar value boxes for danceability, liveness, and duration
-        
-        # Add data table
-        output$track_table <- renderDT({
-          datatable(
-            top_tracks,
-            options = list(
-              pageLength = 5,
-              dom = 'ftip',
-              scrollX = TRUE
-            ),
-            style = "bootstrap4"
-          )
-        })
-      } else {
-        # Handle case where no albums are found for the artist
-        output$frame <- renderUI({
-          tags$div("Oops! No Albums found for this Artist 🥺")
-        })
+      if (nrow(albums) == 0) {
+        showNotification("No albums found for this artist", type = "warning")
+        return()
       }
-    },
-    error = function(e) {
+      
+      print(paste("Found", nrow(albums), "albums"))  # Debug print
+      
+      # Rest of your analysis code...
+    }, error = function(e) {
+      print(e)  # Debug print
       showNotification(
-        "Error accessing Spotify API. Please try again.",
+        paste("Error:", e$message),
         type = "error"
       )
     })
-    
-    w$hide()  # Hide loading screen
   })
 }
 
