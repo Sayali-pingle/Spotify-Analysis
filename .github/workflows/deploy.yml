@@ -22,7 +22,27 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
+          sudo apt-get install -y \
+            libcurl4-openssl-dev \
+            libssl-dev \
+            libxml2-dev \
+            libpng-dev \
+            libjpeg-dev \
+            libfontconfig1-dev \
+            libharfbuzz-dev \
+            libfribidi-dev \
+            libfreetype6-dev \
+            libmagick++-dev \
+            libgit2-dev \
+            libssh2-1-dev \
+            zlib1g-dev \
+            libbz2-dev \
+            liblzma-dev
+
+      - name: Install BiocManager
+        run: |
+          Rscript -e 'install.packages("BiocManager", repos="http://cran.rstudio.com/")'
+          Rscript -e 'BiocManager::install("Biobase")'
 
       - name: Install R packages
         run: |
