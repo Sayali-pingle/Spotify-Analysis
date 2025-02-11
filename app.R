@@ -11,7 +11,8 @@ required_packages <- c(
   "waiter",
   "markdown",
   "dplyr",
-  "ggplot2"
+  "ggplot2",
+  "rsconnect"
 )
 
 for (pkg in required_packages) {
