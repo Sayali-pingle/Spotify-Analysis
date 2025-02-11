@@ -1,12 +1,25 @@
-# Load required libraries
-library(shiny)
-library(spotifyr)
-library(tidyverse)
-library(shinydashboard)
-library(plotly)
-library(DT)
-library(shinyWidgets)
-library(waiter)
+# At the very top of app.R
+if (!require(pak)) install.packages("pak")
+required_packages <- c(
+  "tidyverse",
+  "shiny",
+  "spotifyr",
+  "shinydashboard",
+  "plotly",
+  "DT",
+  "shinyWidgets",
+  "waiter",
+  "markdown",
+  "dplyr",
+  "ggplot2"
+)
+
+for (pkg in required_packages) {
+  if (!require(pkg, character.only = TRUE)) {
+    pak::pkg_install(pkg)
+    library(pkg, character.only = TRUE)
+  }
+}
 
 # Function to retrieve and analyze Spotify data for a given artist
 artist_details <- function(artist_name, client_id, secret_id) {
