@@ -17,6 +17,11 @@ The primary goal of this project is to develop an interactive and visually appea
 library(shiny)
 library(spotifyr)
 library(tidyverse)
+library(shinydashboard)
+library(plotly)
+library(DT)
+library(shinyWidgets)
+library(waiter)
 
 # Function to retrieve and analyze Spotify data for a given artist
 artist_details <- function(artist_name, client_id, secret_id) {
@@ -181,69 +186,82 @@ artist_details <- function(artist_name, client_id, secret_id) {
 }
 
 # Shiny UI
-ui <- fluidPage(
-  shinyjs::useShinyjs(),
-  titlePanel(
-    div(
-      style = "font-weight: bold; font-family: 'Arial', sans-serif; font-size: 42px;",
-      "KNOW YOUR FAVOURITE SINGERS!!"
+ui <- dashboardPage(
+  skin = "green",
+  dashboardHeader(title = "Spotify Artist Analytics"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
+      menuItem("About", tabName = "about", icon = icon("info-circle"))
+    ),
+    textInput("artist_name", "Enter Artist Name", ""),
+    passwordInput("client_id", "Enter API Client ID"),
+    passwordInput("secret_id", "Enter API Secret ID"),
+    actionBttn(
+      "analyze_button",
+      "Analyze",
+      style = "gradient",
+      color = "success"
     )
   ),
-  tags$style(HTML("
-    body {
-      background: linear-gradient(to right, #50C878, #000000);
-    }
-    .my-well-panel {
-      background-color: #013220;
-      border: 1px solid #000000;
-      border-radius: 3px;
-      padding: 10px;
-      margin: 10px 0;
-    }
-    .my-well-panel-text {
-      color: #FFFFFF;
-      font-size: 14px;
-      font-family: 'Arial', sans-serif;
-    }
-  ")),
-  sidebarLayout(
-    sidebarPanel(
-      width = 3,
-      textInput("artist_name", "Enter Artist Name", ""),
-      textInput("client_id", "Enter API Client ID", value = "4a8518820eed448b8fe7057732e01a56"),
-      textInput("secret_id", "Enter API Secret ID", value = "e0ca0b77788c4405b7f307beb584bc52"),
-      actionButton("analyze_button", "Analyze"),
-      htmlOutput("frame"),
-      conditionalPanel(
-        condition = "input.analyze_button > 0 && !output.frame",
-        tags$div(
-          class = "loading-message",
-          style = "color: #000000; font-size: 14px; font-family: 'Arial', sans-serif;",
-          "Loading results. Please wait..."
-        )
-      )
+  dashboardBody(
+    use_waiter(), # Add loading screen
+    tags$head(
+      tags$style(HTML("
+        .content-wrapper { background-color: #1E1E1E; }
+        .box { background-color: #2D2D2D; color: white; }
+      "))
     ),
-    mainPanel(
-      fluidRow(
-        column(8, plotOutput("countPlot")),
-        column(4, wellPanel(
-          textOutput("max_energy_album_output"),
-          style = "background-color: #013220; border: 1px solid #000000; border-radius: 3px; padding: 10px; margin: 10px 0; color: white; font-size: 15px;"
-        ), wellPanel(
-          textOutput("max_danceability_album_output"),
-          style = "background-color: #013220; border: 1px solid #000000; border-radius: 3px; padding: 10px; margin: 10px 0; color: white; font-size: 15px;"
-        ), wellPanel(
-          textOutput("max_liveness_album_output"),
-          style = "background-color: #013220; border: 1px solid #000000; border-radius: 3px; padding: 10px; margin: 10px 0; color: white; font-size: 15px;"
-        ), wellPanel(
-          textOutput("avg_song_duration"),
-          style = "background-color: #013220; border: 1px solid #000000; border-radius: 3px; padding: 10px; margin: 10px 0; color: white; font-size: 15px;"
-        ))
+    tabItems(
+      tabItem(
+        tabName = "dashboard",
+        fluidRow(
+          box(
+            width = 12,
+            status = "success",
+            solidHeader = TRUE,
+            htmlOutput("frame")
+          )
+        ),
+        fluidRow(
+          valueBoxOutput("energy_box", width = 3),
+          valueBoxOutput("dance_box", width = 3),
+          valueBoxOutput("live_box", width = 3),
+          valueBoxOutput("duration_box", width = 3)
+        ),
+        fluidRow(
+          box(
+            width = 8,
+            status = "success",
+            plotlyOutput("countPlot")
+          ),
+          box(
+            width = 4,
+            status = "success",
+            plotlyOutput("popPlot")
+          )
+        ),
+        fluidRow(
+          box(
+            width = 12,
+            status = "success",
+            plotlyOutput("valence_plot")
+          )
+        ),
+        fluidRow(
+          box(
+            width = 12,
+            status = "success",
+            DTOutput("track_table")
+          )
+        )
       ),
-      fluidRow(
-        style = "margin-top: 5px;",
-        column(7, plotOutput("popPlot")),
-        column(5, plotOutput("valence_plot"))
+      tabItem(
+        tabName = "about",
+        box(
+          width = 12,
+          includeMarkdown("about.md")
+        )
       )
     )
   )
@@ -251,6 +269,12 @@ ui <- fluidPage(
 
 # Shiny Server
 server <- function(input, output) {
+  # Add loading screen
+  w <- Waiter$new(
+    html = spin_flower(),
+    color = transparent(.5)
+  )
+  
   observeEvent(input$analyze_button, {
     # Reset the frame and loading message when the artist name changes
     output$frame <- renderUI(NULL)
@@ -293,26 +317,45 @@ server <- function(input, output) {
       })
       
       # Render plots
-      output$countPlot <- renderPlot({
+      output$countPlot <- renderPlotly({
         if (!is.null(result$key_plot)) {
-          print(result$key_plot)
-        } else {
-          plot(NULL, type = "n", xlab = "", ylab = "")
+          ggplotly(result$key_plot)
         }
       })
-      output$popPlot <- renderPlot({
+      output$popPlot <- renderPlotly({
         if (!is.null(result$popularity_plot)) {
-          print(result$popularity_plot)
-        } else {
-          plot(NULL, type = "n", xlab = "", ylab = "")
+          ggplotly(result$popularity_plot)
         }
       })
-      output$valence_plot <- renderPlot({
+      output$valence_plot <- renderPlotly({
         if (!is.null(result$heatmap_plot)) {
-          print(result$heatmap_plot)
-        } else {
-          plot(NULL, type = "n", xlab = "", ylab = "")
+          ggplotly(result$heatmap_plot)
         }
+      })
+      
+      # Add value boxes
+      output$energy_box <- renderValueBox({
+        valueBox(
+          paste0(result$max_energy * 100, "%"),
+          "Max Energy",
+          icon = icon("bolt"),
+          color = "green"
+        )
+      })
+      
+      # Add similar value boxes for danceability, liveness, and duration
+      
+      # Add data table
+      output$track_table <- renderDT({
+        datatable(
+          top_tracks,
+          options = list(
+            pageLength = 5,
+            dom = 'ftip',
+            scrollX = TRUE
+          ),
+          style = "bootstrap4"
+        )
       })
     } else {
       # Handle case where no albums are found for the artist
