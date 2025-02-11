@@ -26,9 +26,37 @@ jobs:
 
       - name: Install R packages
         run: |
-          Rscript -e 'install.packages(c("rsconnect", "shiny", "spotifyr", "tidyverse", "shinydashboard", "plotly", "DT", "shinyWidgets", "waiter"))'
+          Rscript -e '
+          install.packages(c(
+            "rsconnect",
+            "shiny",
+            "tidyverse",
+            "spotifyr",
+            "shinydashboard",
+            "plotly",
+            "DT",
+            "shinyWidgets",
+            "waiter",
+            "markdown",
+            "dplyr",
+            "ggplot2"
+          ), dependencies=TRUE, repos="http://cran.rstudio.com/")'
+          
+      - name: Set environment variables
+        run: |
+          echo "SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "SPOTIFY_CLIENT_SECRET=${{ secrets.SPOTIFY_CLIENT_SECRET }}" >> $GITHUB_ENV
           
       - name: Deploy to shinyapps.io
         run: |
-          Rscript -e 'rsconnect::setAccountInfo(name=Sys.getenv("SHINYAPPS_NAME"), token=Sys.getenv("SHINYAPPS_TOKEN"), secret=Sys.getenv("SHINYAPPS_SECRET"))'
-          Rscript -e 'rsconnect::deployApp()' 
+          Rscript -e '
+          library(rsconnect)
+          rsconnect::setAccountInfo(
+            name=Sys.getenv("SHINYAPPS_NAME"),
+            token=Sys.getenv("SHINYAPPS_TOKEN"),
+            secret=Sys.getenv("SHINYAPPS_SECRET")
+          )
+          rsconnect::deployApp(
+            appName = "spotify-artist-analytics",
+            forceUpdate = TRUE
+          )' 
