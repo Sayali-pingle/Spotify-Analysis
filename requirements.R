@@ -11,5 +11,6 @@ pak::pkg_install(c(
   "waiter",
   "markdown",
   "dplyr",
-  "ggplot2"
+  "ggplot2",
+  "rsconnect"
 )) 
