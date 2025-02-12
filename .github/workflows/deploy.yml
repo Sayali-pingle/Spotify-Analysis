@@ -1,4 +1,4 @@
-name: Deploy Shiny App
+ame: Deploy Shiny App
 
 on:
   push:
@@ -31,6 +31,7 @@ jobs:
       - name: Install R dependencies
         run: |
           Rscript -e '
+          options(repos = c(CRAN = "https://cloud.r-project.org"))
           install.packages(c(
             "curl", 
             "rsconnect",
@@ -44,8 +45,9 @@ jobs:
             "shinyWidgets",
             "waiter",
             "dplyr",
-            "ggplot2"
-          ), repos="https://cloud.r-project.org")'
+            "ggplot2",
+            "pak"
+          ))'
           
       - name: Deploy to shinyapps.io
         run: |
@@ -59,4 +61,4 @@ jobs:
           rsconnect::deployApp(
             appName = "spotify-artist-analytics",
             forceUpdate = TRUE
-          )' 
+          )'
