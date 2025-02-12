@@ -28,9 +28,24 @@ jobs:
             libxml2-dev \
             libgit2-dev
           
-      - name: Install rsconnect
+      - name: Install R dependencies
         run: |
-          Rscript -e 'install.packages(c("curl", "rsconnect"), repos="https://cloud.r-project.org")'
+          Rscript -e '
+          install.packages(c(
+            "curl", 
+            "rsconnect",
+            "markdown",
+            "tidyverse",
+            "shiny",
+            "spotifyr",
+            "shinydashboard",
+            "plotly",
+            "DT",
+            "shinyWidgets",
+            "waiter",
+            "dplyr",
+            "ggplot2"
+          ), repos="https://cloud.r-project.org")'
           
       - name: Deploy to shinyapps.io
         run: |
