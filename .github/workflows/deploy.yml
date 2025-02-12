@@ -26,7 +26,18 @@ jobs:
             libcurl4-openssl-dev \
             libssl-dev \
             libxml2-dev \
-            libgit2-dev
+            libgit2-dev \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libjpeg-dev \
+            libpng-dev \
+            libtiff-dev \
+            libicu-dev \
+            libfribidi-dev \
+            libharfbuzz-dev \
+            pandoc \
+            libglpk-dev \
+            libgmp3-dev
           
       - name: Install R dependencies
         run: |
@@ -46,8 +57,10 @@ jobs:
             "waiter",
             "dplyr",
             "ggplot2",
-            "pak"
-          ))'
+            "pak",
+            "rmarkdown",
+            "knitr"
+          ), dependencies=TRUE)'
           
       - name: Deploy to shinyapps.io
         run: |
