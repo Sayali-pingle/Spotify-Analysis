@@ -1,3 +1,4 @@
+install.packages("rsconnect")
 library(rsconnect)
 
 # Read from environment variables
