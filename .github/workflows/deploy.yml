@@ -1,4 +1,4 @@
-ame: Deploy Shiny App
+name: Deploy Shiny App
 
 on:
   push:
@@ -61,4 +61,4 @@ jobs:
           rsconnect::deployApp(
             appName = "spotify-artist-analytics",
             forceUpdate = TRUE
-          )'
+          )' 
