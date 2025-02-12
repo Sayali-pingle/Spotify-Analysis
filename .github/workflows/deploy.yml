@@ -21,11 +21,14 @@ jobs:
         
       - name: Install rsconnect
         run: |
-          Rscript -e 'install.packages("rsconnect")'
+          Rscript -e 'install.packages("rsconnect", repos = "https://cran.rstudio.com/")'
+          Rscript -e 'if (!require("rsconnect")) { install.packages("rsconnect", repos = "https://cran.rstudio.com/") }'
+          Rscript -e 'library(rsconnect)'
           
       - name: Deploy to shinyapps.io
         run: |
           Rscript -e '
+          if (!require("rsconnect")) { install.packages("rsconnect", repos = "https://cran.rstudio.com/") }
           library(rsconnect)
           rsconnect::setAccountInfo(
             name=Sys.getenv("SHINYAPPS_NAME"),
@@ -35,4 +38,4 @@ jobs:
           rsconnect::deployApp(
             appName = "spotify-artist-analytics",
             forceUpdate = TRUE
-          )' 
+          )'
