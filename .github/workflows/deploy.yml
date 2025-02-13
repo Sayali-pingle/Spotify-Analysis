@@ -22,23 +22,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
 
-      - name: Install pak
-        run: |
-          Rscript -e 'install.packages("pak", repos = "https://cloud.r-project.org")'
-          
       - name: Install R dependencies
         run: |
           Rscript -e '
-          if (!require("pak")) install.packages("pak", repos = "https://cloud.r-project.org")
-          pak::pkg_install(c(
+          options(repos = c(RSPM = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))
+          install.packages(c(
+            "rsconnect",
             "shiny",
             "shinydashboard",
-            "tidyverse",
             "DT",
             "plotly",
             "waiter",
-            "spotifyr",
-            "rsconnect"
+            "spotifyr"
           ))'
           
       - name: Deploy to shinyapps.io
